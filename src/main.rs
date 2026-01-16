@@ -12,16 +12,17 @@ fn main() -> Result<(), MagicCapError> {
     let c = Cursor::new(crud);
     let br = BufReader::new(c);
     let bri = BufReaderIterator::new(br,blocksize);
-    let (mut key,_key_bytes) = make_key().unwrap();
+    let key_bytes = new_key_bytes().unwrap();
     // this compiles and runs!
     // let v:Vec<()> = bri.into_iter().map(|(plaintext_block,bytes_read)| println!("{bytes_read}")).collect();
     let _v:Vec<()> = bri.into_iter()
         .enumerate()
-        // .par_iter()
+        .par_bridge()
         .map(|(block_from_zero,(mut plaintext_block,bytes_read))|
              { // closure can use bindings from outer scope
                  let offset = blocksize * (block_from_zero + 1);
-                 key.try_seek(offset).unwrap(); // unwrap is 😨
+                 let mut key = key_from_bytes(key_bytes);
+                 key.try_seek(offset).expect("this only fails if we encrypt truly massive files, what have you done?"); // unwrap is 😨
                  encryptor(&mut key,&mut plaintext_block);
                  println!("{bytes_read} {block_from_zero} real actual block number is {}",block_from_zero+1)
              }

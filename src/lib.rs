@@ -1,10 +1,10 @@
 use std::io;
 use std::io::{BufReader, Read, Write};
-use aes::cipher::{KeyIvInit, StreamCipher};
+use aes::cipher::{KeyIvInit, StreamCipher, StreamCipherSeek, StreamCipherError};
 use ctr;
 use getrandom;
 use thiserror::Error;
-use rayon::prelude::*;
+// use rayon::prelude::*;
 
 pub fn print_hello_world() {
     let _ = io::stdout().write_all(b"Hello, world!\n");
@@ -52,6 +52,9 @@ where
         }
     }
 }
+
+
+/*
 impl<R> ParallelIterator for BufReaderIterator<R>
 where R: Read + Send,
 {
@@ -63,7 +66,7 @@ where R: Read + Send,
         todo!()
     }
 }
-
+*/
 // key pieces
 
 type TahoeAesCtr = ctr::Ctr128BE<aes::Aes128>;
@@ -73,15 +76,33 @@ pub fn encryptor(key: &mut TahoeAesCtr, plain_text_block: &mut Vec<u8>) -> () {
     // return plain_text_block; mutated in place!
 }
 
-pub fn make_key() -> Result<(TahoeAesCtr, [u8; 16]), MagicCapError> {
-    let mut key_bytes = [0u8; 16];
-    let _ = getrandom::fill(&mut key_bytes)?;
+pub fn new_key() -> Result<(TahoeAesCtr, [u8; 16]), MagicCapError> {
     let iv = [0u8; 16]; // 16 bytes of 0's
+    let key_bytes = new_key_bytes()?;
     let key = TahoeAesCtr::new(&key_bytes.into(), &iv.into());
     Ok((key, key_bytes))
 }
 
-                                                                                                                                                                                                                                                                                                                                            // error struct
+pub fn new_key_bytes() -> Result<[u8;16], MagicCapError> {
+    let mut key_bytes = [0u8; 16];
+    let _ = getrandom::fill(&mut key_bytes)?;
+    Ok(key_bytes)
+}
+
+pub fn key_from_bytes(key_bytes: [u8; 16]) -> TahoeAesCtr {
+    let iv = [0u8; 16];
+    TahoeAesCtr::new(&key_bytes.into(), &iv.into())
+}
+
+pub fn key_from_bytes_with_offset(key_bytes: [u8; 16],offset: usize) -> Result<TahoeAesCtr,MagicCapError> {
+    let iv = [0u8; 16];
+    let mut key = TahoeAesCtr::new(&key_bytes.into(), &iv.into());
+    key.try_seek(offset)?;
+    Ok(key)
+
+}
+
+// error struct
 #[derive(Error,Debug)]
 pub enum MagicCapError {
     #[error("merkle root invalid, file integrity could not be verified.")]
@@ -96,6 +117,8 @@ pub enum MagicCapError {
     // CapnProtoError(#[source] #[from] capnp::Error),
     #[error("Metadata hash does not match expected, do you have the wrong encrypted file?")]
     MerkleRootDoesNotMatch,
+    #[error("Cipher seek failed")]
+    StreamCipherError(#[from] cipher::StreamCipherError) // XXX exactly what trait bounds are missing for #[source] and #[from] ?
 
     // do we only get one single wrapper per concrete type? yes, unless wrapping in another enum!
     // or if you don't use source / from, which both call ~into~

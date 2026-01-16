@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 aes = "0.8.4"
-cipher = "0.4.4"
+cipher = {version = "0.4.4", features = ["std"]}
 ctr = "0.9.2"
 data-encoding = "2.10.0"
 getrandom = "0.3.4"
@@ -14,4 +14,3 @@ proptest = "1.9.0"
 rayon = "1.11.0"
 rs_merkle = "1.5.0"
 thiserror = "2.0.17"
-
